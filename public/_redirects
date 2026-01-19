@@ -1,0 +1,7 @@
+# LinkedIn OAuth Proxy
+/api/linkedin/oauth/*  https://www.linkedin.com/oauth/v2/:splat  200
+
+# LinkedIn API Proxy
+/api/linkedin/api/*    https://api.linkedin.com/v2/:splat        200
+
+/* /index.html 200
