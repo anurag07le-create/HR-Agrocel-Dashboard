@@ -1,13 +1,18 @@
 export const getDocUrls = (url) => {
-    if (!url) return { preview: '', download: '' };
+    if (!url || typeof url !== 'string' || url.trim() === '' || url.toLowerCase() === 'n/a' || url.toLowerCase() === 'undefined' || url.toLowerCase() === 'null') {
+        return { preview: null, download: null };
+    }
 
-    // Clean URL: remove all whitespace/newlines which might come from bad CSV data
+    // Clean URL: remove all whitespace/newlines
     url = url.replace(/\s/g, '');
 
+    // If it's already a preview/embedded URL, return it as is
+    if (url.includes('embedded=true') || url.includes('/preview')) {
+        return { preview: url, download: url.replace('/preview', '/view'), id: '' };
+    }
+
     let id = '';
-    // Match id=... until & or end of string
     const idMatch = url.match(/id=([^&]+)/);
-    // Match /d/... until / or ? or end of string
     const fileMatch = url.match(/\/d\/([^/?]+)/);
 
     if (idMatch) {
@@ -17,20 +22,21 @@ export const getDocUrls = (url) => {
     }
 
     if (!id) {
-        // Fallback: If we can't extract ID, try using Google Docs Viewer with the original URL
-        // This might work for some non-Drive URLs or weird formats
-        return {
-            preview: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`,
-            download: url,
-            id: ''
-        };
+        // Fallback: If it's a direct link to a file (pdf, docx, etc.)
+        if (url.startsWith('http')) {
+            return {
+                preview: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`,
+                download: url,
+                id: ''
+            };
+        }
+        return { preview: null, download: null };
     }
 
     // Download URL
     const download = `https://drive.google.com/uc?export=download&id=${id}`;
-
-    // Preview URL - Using Google Docs Viewer which is more reliable for embedding
-    const preview = `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(download)}`;
+    // Preview URL - Using native Google Drive preview
+    const preview = `https://drive.google.com/file/d/${id}/preview`;
 
     return { preview, download, id };
 };

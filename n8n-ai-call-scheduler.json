@@ -1,0 +1,85 @@
+{
+  "name": "AI Call Scheduler",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 60
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "sheetId": "YOUR_GOOGLE_SHEET_ID",
+        "range": "Log!A:Z"
+      },
+      "id": "read-sheet",
+      "name": "Read Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [220, 0],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current time in IST\nconst now = new Date();\nconst istOffset = 5.5 * 60 * 60 * 1000;\nconst istNow = new Date(now.getTime() + istOffset);\n\nconst currentDay = String(istNow.getUTCDate()).padStart(2, '0');\nconst currentMonth = String(istNow.getUTCMonth() + 1).padStart(2, '0');\nconst currentYear = istNow.getUTCFullYear();\nconst currentHour = istNow.getUTCHours();\nconst currentMinute = istNow.getUTCMinutes();\n\nconst currentDate = `${currentDay}/${currentMonth}/${currentYear}`;\nconst currentTime = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;\n\nconsole.log(`[SCHEDULER] Checking at ${currentDate} ${currentTime}`);\n\nconst items = $input.all();\nconst toTrigger = [];\n\nfor (const item of items) {\n  const row = item.json;\n  \n  // Get interview date/time from column I (Interview date)\n  const interviewDateTime = row['Interview date'] || '';\n  if (!interviewDateTime) continue;\n  \n  // Get interview type from column K (Interview type)\n  const interviewType = (row['Interview type'] || '').toLowerCase();\n  const isAiCall = interviewType.includes('ai') && (interviewType.includes('call') || interviewType.includes('voice') || interviewType.includes('agent'));\n  \n  if (!isAiCall) continue;\n  \n  // Parse date and time from format: \"30/03/2026, 11:14 am\"\n  const parts = interviewDateTime.split(',').map(s => s.trim());\n  const datePart = parts[0] || '';\n  const timePart = parts[1] || '';\n  \n  // Check if date matches\n  if (datePart !== currentDate) continue;\n  \n  // Parse time\n  const timeMatch = timePart.toUpperCase().match(/(\\d{1,2}):(\\d{2})\\s*(AM|PM)?/i);\n  if (!timeMatch) continue;\n  \n  let intHour = parseInt(timeMatch[1]);\n  const intMinute = parseInt(timeMatch[2]);\n  const ampm = timeMatch[3];\n  \n  if (ampm === 'PM' && intHour !== 12) intHour += 12;\n  if (ampm === 'AM' && intHour === 12) intHour = 0;\n  \n  // Check if time matches (within current minute)\n  if (intHour !== currentHour || intMinute !== currentMinute) continue;\n  \n  console.log(`[SCHEDULER] MATCH FOUND: ${row['Name of the Candidate']} at ${timePart}`);\n  \n  toTrigger.push({\n    json: {\n      candidateName: row['Name of the Candidate'] || '',\n      email: row['Email'] || '',\n      role: row['Role'] || '',\n      logId: row['Log ID'] || '',\n      rowId: row['Row ID'] || row['row_id'] || '',\n      contact: row['Contact Number'] || '',\n      cv: row['CV'] || '',\n      summary: row['Summary'] || '',\n      score: row['Score'] || '',\n      status: row['Status'] || '',\n      interviewDate: interviewDateTime,\n      interviewType: row['Interview type'] || '',\n      meetingLink: row['Meeting link'] || '',\n      location: row['Location'] || '',\n      department: row['Department'] || '',\n      position: row['Position'] || ''\n    }\n  });\n}\n\nif (toTrigger.length === 0) {\n  console.log('[SCHEDULER] No matches found');\n}\n\nreturn toTrigger;"
+      },
+      "id": "check-time",
+      "name": "Check Time Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://studio.pucho.ai/api/v1/webhooks/flcmow4Rl8mvhNQE62ESr/sync",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Name of the Candidate\": {{ $json.candidateName }},\n  \"Email\": {{ $json.email }},\n  \"Role\": {{ $json.role }},\n  \"Log ID\": {{ $json.logId }},\n  \"Row ID\": {{ $json.rowId }},\n  \"Contact Number\": {{ $json.contact }},\n  \"CV\": {{ $json.cv }},\n  \"Summary\": {{ $json.summary }},\n  \"Score\": {{ $json.score }},\n  \"Status\": {{ $json.status }},\n  \"Interview date\": {{ $json.interviewDate }},\n  \"Interview type\": {{ $json.interviewType }},\n  \"Meeting link\": {{ $json.meetingLink }},\n  \"Location\": {{ $json.location }},\n  \"Department\": {{ $json.department }},\n  \"Position\": {{ $json.position }}\n}",
+        "options": {}
+      },
+      "id": "trigger-webhook",
+      "name": "Trigger AI Call Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Every Minute": {
+      "main": [
+        [{ "node": "Read Google Sheet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read Google Sheet": {
+      "main": [
+        [{ "node": "Check Time Match", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Time Match": {
+      "main": [
+        [{ "node": "Trigger AI Call Webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

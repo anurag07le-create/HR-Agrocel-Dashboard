@@ -42,6 +42,10 @@ export default {
                     '100%': { opacity: '1', transform: 'scale(1)' },
                 },
             },
+            fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+                space: ['"Space Grotesk"', 'sans-serif'],
+            },
         },
     },
     plugins: [],

@@ -11,21 +11,18 @@ export const useTheme = () => {
 };
 
 export const ThemeProvider = ({ children }) => {
-    // Default to dark mode as per current design
-    const [theme, setTheme] = useState(() => {
-        const savedTheme = localStorage.getItem('theme');
-        return savedTheme || 'dark';
-    });
+    // Force light mode
+    const [theme] = useState('light');
 
     useEffect(() => {
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
-        root.classList.add(theme);
-        localStorage.setItem('theme', theme);
-    }, [theme]);
+        root.classList.add('light');
+    }, []);
 
     const toggleTheme = () => {
-        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+        // Function exists to prevent breakages, but does nothing
+        console.warn('Theme toggling is disabled.');
     };
 
     return (

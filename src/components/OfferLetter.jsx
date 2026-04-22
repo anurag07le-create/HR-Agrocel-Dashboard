@@ -1,237 +1,566 @@
-import React, { useState, useRef } from 'react';
-import { Printer, Download, RefreshCw, Type, Calendar, DollarSign, User, Building, Briefcase, FileText, Sparkles, Upload } from 'lucide-react';
-import defaultLogo from '../assets/enkindle_logo.png';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { Printer, User, Building, Briefcase, Calendar, MapPin, Phone, Mail, FileText, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CalendarDays } from 'lucide-react';
+
+// Modern Date Picker Component
+const ModernDatePicker = ({ selectedDate, onChange, placeholder = "Select date", disablePast = true }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [showMonthYearPicker, setShowMonthYearPicker] = useState(false);
+    const containerRef = useRef(null);
+    const dropdownRef = useRef(null);
+
+    const currentSelected = useMemo(() => {
+        if (!selectedDate) return new Date();
+        const d = new Date(selectedDate);
+        return isNaN(d.getTime()) ? new Date() : d;
+    }, [selectedDate]);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            const clickedInContainer = containerRef.current && containerRef.current.contains(e.target);
+            const clickedInDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+            if (!clickedInContainer && !clickedInDropdown) {
+                setIsOpen(false);
+                setShowMonthYearPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const shortMonthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayNames = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+    const getDaysInMonth = (year, month) => {
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const daysInPrevMonth = new Date(year, month, 0).getDate();
+        
+        const days = [];
+        const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+        
+        for (let i = adjustedFirstDay - 1; i >= 0; i--) {
+            days.push({ day: daysInPrevMonth - i, currentMonth: false });
+        }
+        for (let i = 1; i <= daysInMonth; i++) {
+            days.push({ day: i, currentMonth: true });
+        }
+        const remaining = 42 - days.length;
+        for (let i = 1; i <= remaining; i++) {
+            days.push({ day: i, currentMonth: false });
+        }
+        return days;
+    };
+
+    const handleSelectDate = (day, isCurrentMonth) => {
+        if (!isCurrentMonth) return;
+        const year = currentSelected.getFullYear();
+        const month = currentSelected.getMonth();
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        onChange({ target: { name: '', value: dateStr } });
+        setIsOpen(false);
+        setShowMonthYearPicker(false);
+    };
+
+    const goToToday = () => {
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        onChange({ target: { name: '', value: dateStr } });
+        setIsOpen(false);
+        setShowMonthYearPicker(false);
+    };
+
+    const goToPrevMonth = () => {
+        const newDate = new Date(currentSelected.getFullYear(), currentSelected.getMonth() - 1, currentSelected.getDate());
+        const dateStr = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+        onChange({ target: { name: '', value: dateStr } });
+    };
+
+    const goToNextMonth = () => {
+        const newDate = new Date(currentSelected.getFullYear(), currentSelected.getMonth() + 1, currentSelected.getDate());
+        const dateStr = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+        onChange({ target: { name: '', value: dateStr } });
+    };
+
+    const goToPrevYear = () => {
+        const newDate = new Date(currentSelected.getFullYear() - 1, currentSelected.getMonth(), currentSelected.getDate());
+        const dateStr = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+        onChange({ target: { name: '', value: dateStr } });
+    };
+
+    const goToNextYear = () => {
+        const newDate = new Date(currentSelected.getFullYear() + 1, currentSelected.getMonth(), currentSelected.getDate());
+        const dateStr = `${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}`;
+        onChange({ target: { name: '', value: dateStr } });
+    };
+
+    const isToday = (day) => {
+        const today = new Date();
+        return day === today.getDate() && currentSelected.getMonth() === today.getMonth() && currentSelected.getFullYear() === today.getFullYear();
+    };
+
+    const isPastDate = (day) => {
+        if (!disablePast) return false;
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const dateToCheck = new Date(currentSelected.getFullYear(), currentSelected.getMonth(), day);
+        return dateToCheck < today;
+    };
+
+    const isSelected = (day) => {
+        return selectedDate && day === currentSelected.getDate();
+    };
+
+    const days = getDaysInMonth(currentSelected.getFullYear(), currentSelected.getMonth());
+    const years = Array.from({ length: 21 }, (_, i) => currentSelected.getFullYear() - 10 + i);
+
+    const formatDisplayDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
+    const buttonRef = useRef(null);
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+
+    useEffect(() => {
+        if (isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setDropdownPosition({
+                top: rect.bottom + window.scrollY + 8,
+                left: rect.left + window.scrollX
+            });
+        }
+    }, [isOpen]);
+
+    const dropdownContent = isOpen && createPortal(
+        <div 
+            ref={dropdownRef}
+            className="fixed z-[9999] bg-white rounded-xl shadow-2xl border border-gray-200 p-4 w-[280px]"
+            style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+        >
+            {showMonthYearPicker ? (
+                <div className="animate-fade-in">
+                    <div className="flex items-center justify-between mb-3">
+                        <button type="button" onClick={goToPrevYear} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                            <ChevronLeft className="w-4 h-4 text-gray-500" />
+                        </button>
+                        <span className="text-sm font-semibold text-gray-800">{currentSelected.getFullYear()}</span>
+                        <button type="button" onClick={goToNextYear} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        {monthNames.map((name, idx) => (
+                            <button
+                                type="button"
+                                key={idx}
+                                onClick={() => {
+                                    const newDate = new Date(currentSelected.getFullYear(), idx, 1);
+                                    const maxDay = new Date(idx + 1 === 12 ? currentSelected.getFullYear() + 1 : currentSelected.getFullYear(), (idx + 1) % 12, 0).getDate();
+                                    const day = Math.min(currentSelected.getDate(), maxDay);
+                                    const dateStr = `${newDate.getFullYear()}-${String(idx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                    onChange({ target: { name: '', value: dateStr } });
+                                    setShowMonthYearPicker(false);
+                                }}
+                                className={`py-2.5 text-xs font-medium rounded-lg transition-all ${
+                                    idx === currentSelected.getMonth()
+                                        ? 'bg-[#6366f1] text-white'
+                                        : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                {shortMonthNames[idx]}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                <div className="animate-fade-in">
+                    <div className="flex items-center justify-between mb-4">
+                        <button type="button" onClick={goToPrevMonth} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                            <ChevronUp className="w-4 h-4 text-gray-500" />
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => setShowMonthYearPicker(true)}
+                            className="flex items-center gap-1 px-2 py-1 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <span className="text-sm font-semibold text-gray-800">
+                                {monthNames[currentSelected.getMonth()]}, {currentSelected.getFullYear()}
+                            </span>
+                            <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                        <button type="button" onClick={goToNextMonth} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-0 mb-2">
+                        {dayNames.map(day => (
+                            <div key={day} className="text-center text-[10px] font-semibold text-gray-400 uppercase py-1">{day}</div>
+                        ))}
+                    </div>
+
+                            <div className="grid grid-cols-7 gap-0">
+                                {days.map((dayObj, idx) => {
+                                    const disabled = !dayObj.currentMonth || isPastDate(dayObj.day);
+                                    return (
+                                        <button
+                                            type="button"
+                                            key={idx}
+                                            onClick={() => handleSelectDate(dayObj.day, dayObj.currentMonth)}
+                                            disabled={disabled}
+                                            className={`
+                                                h-9 w-9 flex items-center justify-center text-sm rounded-full transition-all mx-auto
+                                                ${disabled ? 'text-gray-300 cursor-default' : 'hover:bg-gray-100 cursor-pointer'}
+                                                ${isSelected(dayObj.day) && dayObj.currentMonth ? 'bg-[#6366f1] text-white font-semibold shadow-md shadow-indigo-200' : ''}
+                                                ${isToday(dayObj.day) && !isSelected(dayObj.day) && dayObj.currentMonth ? 'text-[#6366f1] font-medium bg-indigo-50' : ''}
+                                                ${dayObj.currentMonth && !isSelected(dayObj.day) && !isToday(dayObj.day) && !isPastDate(dayObj.day) ? 'text-gray-700' : ''}
+                                            `}
+                                        >
+                                            {dayObj.day}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                        <button 
+                            type="button"
+                            onClick={() => onChange({ target: { name: '', value: '' } })}
+                            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                            Clear
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={goToToday}
+                            className="px-4 py-2 text-xs font-medium text-white bg-[#6366f1] hover:bg-[#4f46e5] rounded-lg transition-colors shadow-sm"
+                        >
+                            Today
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>,
+        document.body
+    );
+
+    return (
+        <div ref={containerRef} className="relative">
+            <button
+                ref={buttonRef}
+                type="button"
+                onClick={() => { setIsOpen(!isOpen); setShowMonthYearPicker(false); }}
+                className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all flex items-center justify-between"
+            >
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <CalendarDays className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <span className={`truncate ${selectedDate ? 'text-gray-700' : 'text-gray-400'}`}>
+                        {selectedDate ? formatDisplayDate(selectedDate) : placeholder}
+                    </span>
+                </div>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dropdownContent}
+        </div>
+    );
+};
+
+// Modern Select Component
+const ModernSelect = ({ name, value, onChange, options }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedOption = options.find(opt => opt.value === value);
+
+    const handleSelect = (optionValue) => {
+        onChange({ target: { name, value: optionValue } });
+        setIsOpen(false);
+    };
+
+    return (
+        <div ref={containerRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full py-2.5 px-3 bg-white border border-gray-200 rounded-xl text-xs text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#6366f1]/20 focus:border-[#6366f1] transition-all flex items-center justify-between appearance-none cursor-pointer"
+            >
+                <span className="truncate">{selectedOption?.label || value}</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isOpen && (
+                <div className="absolute left-0 top-full mt-1 z-50 bg-white rounded-xl shadow-xl shadow-gray-200/80 border border-gray-200 py-1 w-full min-w-[120px] animate-fade-in">
+                    {options.map((option) => (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => handleSelect(option.value)}
+                            className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors ${
+                                value === option.value
+                                    ? 'bg-[#6366f1] text-white'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const getOrdinalNum = (n) => {
+    return n + (n > 0 ? ['th', 'st', 'nd', 'rd'][(n > 3 && n < 21) || n % 10 > 3 ? 0 : n % 10] : '');
+};
+
+const formatDateWithOrdinal = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return date;
+    const day = getOrdinalNum(d.getDate());
+    const month = d.toLocaleDateString('en-US', { month: 'long' });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+};
+
+const formatDotDate = (dateString) => {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}.${mm}.${yyyy}`;
+};
 
 const OfferLetter = () => {
     const [formData, setFormData] = useState({
+        title: 'Mr.',
         candidateName: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        district: '',
+        state: 'Gujarat',
+        pin: '',
+        mobile: '',
+        email: '',
         role: '',
-        companyName: "Let's Enkindle",
+        location: '',
+        managerName: '',
+        managerRole: '',
         joiningDate: '',
-        salary: '',
-        signatoryName: 'Rosa Maria Aguado',
-        signatoryRole: 'Head of Creative Operations',
-        dateOfLetter: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-        logo: defaultLogo
+        returnDate: '',
+        companyName: "Agrocel Industries Pvt. Ltd.",
+        documentCode: 'CF:HRM:F:017',
+        signatoryName: '',
+        signatoryRole: 'General Manager-HR',
+        dateOfLetter: new Date().toISOString().split('T')[0],
     });
 
     const letterRef = useRef();
-    const fileInputRef = useRef(null);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
 
-    const handleLogoUpload = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const logoUrl = URL.createObjectURL(file);
+        if (name === 'companyName') {
+            const code = value === 'Solaris Chemtech Industries Ltd.'
+                ? 'F-HR17/00/01/04/2021'
+                : 'CF:HRM:F:017';
             setFormData(prev => ({
                 ...prev,
-                logo: logoUrl
+                companyName: value,
+                documentCode: code
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value
             }));
         }
-    };
-
-    const triggerFileInput = () => {
-        fileInputRef.current.click();
     };
 
     const handlePrint = () => {
         window.print();
     };
 
+    const firstName = formData.candidateName.split(' ')[0] || '[First Name]';
+    const fullName = formData.candidateName || '[Candidate Name]';
+
     return (
         <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-theme(spacing.24))] gap-8 animate-fade-in pb-8">
             {/* Left Side: Controls - Dark Theme */}
             <div className="w-full lg:w-5/12 glass-card rounded-3xl border border-[var(--border-color)] flex flex-col overflow-hidden print:hidden relative group">
-                {/* Decorative gradients */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -ml-32 -mb-32 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-slate-500/10 rounded-full blur-3xl -ml-32 -mb-32 pointer-events-none"></div>
 
-                <div className="p-8 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]/30 relative z-10">
-                    <div className="flex items-center space-x-3 mb-2">
-                        <div className="p-2 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg shadow-lg shadow-purple-500/20">
-                            <Type className="w-5 h-5 text-white" />
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar relative z-10">
+
+                    {/* Company Details */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Company Details</label>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 ml-1">Company Entity</label>
+                                <ModernSelect
+                                    name="companyName"
+                                    value={formData.companyName}
+                                    onChange={handleInputChange}
+                                    options={[
+                                        { value: 'Agrocel Industries Pvt. Ltd.', label: 'Agrocel Industries Pvt. Ltd.' },
+                                        { value: 'Solaris Chemtech Industries Ltd.', label: 'Solaris Chemtech Industries Ltd.' }
+                                    ]}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 ml-1">Letter Date</label>
+                                    <ModernDatePicker 
+                                        selectedDate={formData.dateOfLetter} 
+                                        onChange={(e) => handleInputChange({ target: { name: 'dateOfLetter', value: e.target.value } })}
+                                        placeholder="Select letter date"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
-                            Letter Details
-                        </h2>
                     </div>
-                    <p className="text-[var(--text-secondary)] text-sm ml-12">Customize the offer letter content</p>
-                </div>
 
-                <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar relative z-10">
-                    <div className="space-y-8">
-                        <div>
-                            <label className="block text-xs font-bold text-purple-400 uppercase tracking-wider mb-4 ml-1">Candidate Info</label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Candidate Name</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-gray-500 group-focus-within:text-purple-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            name="candidateName"
-                                            value={formData.candidateName}
-                                            onChange={handleInputChange}
-                                            className="input-field pl-12 w-full"
-                                            placeholder="e.g. John Doe"
-                                        />
-                                    </div>
-                                </div>
+                    <div className="h-px bg-white/5"></div>
 
-                                <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Role Title</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <Briefcase className="h-5 w-5 text-gray-500 group-focus-within:text-purple-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            name="role"
-                                            value={formData.role}
-                                            onChange={handleInputChange}
-                                            className="input-field pl-12 w-full"
-                                            placeholder="e.g. Senior Designer"
-                                        />
-                                    </div>
-                                </div>
+                    {/* Candidate Identity */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Candidate Details</label>
+                        <div className="grid grid-cols-12 gap-4 mb-4">
+                            <div className="col-span-3">
+                                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 ml-1">Title</label>
+                                <ModernSelect
+                                    name="title"
+                                    value={formData.title}
+                                    onChange={handleInputChange}
+                                    options={[
+                                        { value: 'Mr.', label: 'Mr.' },
+                                        { value: 'Ms.', label: 'Ms.' },
+                                        { value: 'Mrs.', label: 'Mrs.' }
+                                    ]}
+                                />
+                            </div>
+                            <div className="col-span-9">
+                                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Full Name</label>
+                                <input type="text" name="candidateName" value={formData.candidateName} onChange={handleInputChange} placeholder="e.g. Poonam Raj Barmeda" className="input-field w-full py-2.5 px-4 text-sm" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Mobile No.</label>
+                                <input type="text" name="mobile" value={formData.mobile} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. 9978167819" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Email ID</label>
+                                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. candidate@email.com" />
                             </div>
                         </div>
 
-                        <div className="h-px bg-white/10"></div>
+                        {/* Address */}
+                        <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2 ml-1 mt-6">Residential Address</label>
+                        <div className="space-y-4">
+                            <input type="text" name="addressLine1" value={formData.addressLine1} onChange={handleInputChange} placeholder="Line 1 (e.g. Ho. No. 183, Swaminarayan Nagar- 2)" className="input-field w-full py-2.5 px-4 text-sm" />
+                            <input type="text" name="addressLine2" value={formData.addressLine2} onChange={handleInputChange} placeholder="Line 2 (e.g. Near Ravalwadi Relocation)" className="input-field w-full py-2.5 px-4 text-sm" />
+                            <div className="grid grid-cols-2 gap-4">
+                                <input type="text" name="city" value={formData.city} onChange={handleInputChange} placeholder="City (e.g. Bhuj)" className="input-field w-full py-2.5 px-4 text-sm" />
+                                <input type="text" name="district" value={formData.district} onChange={handleInputChange} placeholder="District (e.g. Kutch)" className="input-field w-full py-2.5 px-4 text-sm" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <input type="text" name="state" value={formData.state} onChange={handleInputChange} placeholder="State (e.g. Gujarat)" className="input-field w-full py-2.5 px-4 text-sm" />
+                                <input type="text" name="pin" value={formData.pin} onChange={handleInputChange} placeholder="PIN Code" className="input-field w-full py-2.5 px-4 text-sm" />
+                            </div>
+                        </div>
+                    </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-4 ml-1">Offer Details</label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="h-px bg-white/5"></div>
+
+                    {/* Role & Offer Details */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Offer Specifics</label>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Joining Date</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <Calendar className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="date"
-                                            name="joiningDate"
-                                            value={formData.joiningDate}
-                                            onChange={handleInputChange}
-                                            className="input-field pl-12 w-full"
-                                        />
-                                    </div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Role / Designation</label>
+                                    <input type="text" name="role" value={formData.role} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. Deputy Manager - Accounts and Finance" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Salary</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <DollarSign className="h-5 w-5 text-gray-500 group-focus-within:text-blue-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            name="salary"
-                                            value={formData.salary}
-                                            onChange={handleInputChange}
-                                            className="input-field pl-12 w-full"
-                                            placeholder="e.g. $120,000"
-                                        />
-                                    </div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Work Location</label>
+                                    <input type="text" name="location" value={formData.location} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. Corporate Office Bhujodi" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Manager Name</label>
+                                    <input type="text" name="managerName" value={formData.managerName} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. Mr. Pritesh Solanki" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Manager Role</label>
+                                    <input type="text" name="managerRole" value={formData.managerRole} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. General Manager - Accounts and Finance" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 ml-1">Joining Date (Max)</label>
+                                    <ModernDatePicker 
+                                        selectedDate={formData.joiningDate} 
+                                        onChange={(e) => handleInputChange({ target: { name: 'joiningDate', value: e.target.value } })}
+                                        placeholder="Select joining date"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5 ml-1">Return Signed Copy By</label>
+                                    <ModernDatePicker 
+                                        selectedDate={formData.returnDate} 
+                                        onChange={(e) => handleInputChange({ target: { name: 'returnDate', value: e.target.value } })}
+                                        placeholder="Select return date"
+                                    />
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div className="h-px bg-white/10"></div>
+                    <div className="h-px bg-white/5"></div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-emerald-400 uppercase tracking-wider mb-4 ml-1">Company Details</label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Company Logo</label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-14 h-14 rounded-xl bg-[var(--input-bg)] border border-[var(--border-color)] flex items-center justify-center overflow-hidden shrink-0">
-                                            {formData.logo ? (
-                                                <img src={formData.logo} alt="Logo Preview" className="w-full h-full object-contain" />
-                                            ) : (
-                                                <Building className="w-6 h-6 text-gray-500" />
-                                            )}
-                                        </div>
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            onChange={handleLogoUpload}
-                                            accept="image/*"
-                                            className="hidden"
-                                        />
-                                        <button
-                                            onClick={triggerFileInput}
-                                            className="flex-1 btn-secondary py-3 text-sm flex items-center justify-center border border-[var(--border-color)] text-[var(--text-secondary)]"
-                                        >
-                                            <Upload className="w-4 h-4 mr-2" />
-                                            Upload
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Company Name</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <Building className="h-5 w-5 text-gray-500 group-focus-within:text-emerald-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            name="companyName"
-                                            value={formData.companyName}
-                                            onChange={handleInputChange}
-                                            className="input-field pl-12 w-full"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Signatory Name</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-gray-500 group-focus-within:text-emerald-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            name="signatoryName"
-                                            value={formData.signatoryName}
-                                            onChange={handleInputChange}
-                                            className="input-field pl-12 w-full"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 ml-1">Signatory Role</label>
-                                    <div className="relative group">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <Briefcase className="h-5 w-5 text-gray-500 group-focus-within:text-emerald-400 transition-colors" />
-                                        </div>
-                                        <input
-                                            type="text"
-                                            name="signatoryRole"
-                                            value={formData.signatoryRole}
-                                            onChange={handleInputChange}
-                                            className="input-field pl-12 w-full"
-                                        />
-                                    </div>
-                                </div>
+                    {/* Signatory Details */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 ml-1">Signatory Details</label>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Signatory Name</label>
+                                <input type="text" name="signatoryName" value={formData.signatoryName} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. Ruchir R. Someshwar" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1 ml-1">Signatory Role</label>
+                                <input type="text" name="signatoryRole" value={formData.signatoryRole} onChange={handleInputChange} className="input-field w-full py-2.5 px-4 text-sm" placeholder="e.g. General Manager-HR" />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]/30 relative z-10">
+                <div className="p-5 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]/30 relative z-10">
                     <button
                         onClick={handlePrint}
-                        className="w-full btn-primary flex items-center justify-center py-4 text-lg shadow-xl shadow-purple-500/20 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 border-none text-white font-bold tracking-wide"
+                        className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-bold tracking-wide transition-colors flex items-center justify-center border border-slate-700 shadow-xl shadow-black/20"
                     >
                         <Printer className="w-5 h-5 mr-3" />
                         Print / Save as PDF
@@ -240,132 +569,127 @@ const OfferLetter = () => {
             </div>
 
             {/* Right Side: Preview */}
-            <div className="flex-1 bg-[var(--bg-secondary)] rounded-3xl overflow-hidden flex flex-col relative print:bg-white print:overflow-visible border border-[var(--border-color)] shadow-2xl">
-                {/* Background Grid for Preview Area */}
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none print:hidden"></div>
-                <div className="absolute inset-0 bg-grid-white/[0.02] pointer-events-none print:hidden"></div>
+            <div className="flex-1 bg-slate-200 rounded-3xl overflow-hidden flex flex-col relative print:bg-white print:overflow-visible shadow-inner">
+                <div className="flex-1 overflow-y-auto p-4 md:p-12 flex justify-center custom-scrollbar print:p-0 print:overflow-visible">
 
-                <div className="flex-1 overflow-x-auto overflow-y-auto p-4 md:p-12 flex justify-center custom-scrollbar print:p-0 print:overflow-visible relative z-10 w-full">
-                    {/* A4 Paper */}
+                    {/* A4 Paper Container */}
                     <div
                         ref={letterRef}
-                        className="bg-white w-[210mm] min-h-[297mm] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] relative flex flex-col print:shadow-none print:w-full print:h-auto transform transition-transform duration-500 hover:scale-[1.01]"
+                        className="bg-white w-[210mm] h-[297mm] overflow-hidden shadow-2xl relative flex flex-col print:shadow-none print:w-full font-sans text-black"
+                        style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
                     >
-                        {/* Header Graphic */}
-                        <div className="absolute top-0 left-0 w-full h-32 overflow-hidden pointer-events-none">
-                            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
-                                <path d="M0 0 L100 0 L100 20 L0 100 Z" fill="#f3e8ff" /> {/* Light Purple */}
-                                <path d="M0 0 L70 0 L0 40 Z" fill="#9333ea" opacity="0.1" />
-                                <path d="M0 0 L40 0 L0 25 Z" fill="#9333ea" opacity="0.2" />
-                            </svg>
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-5 rounded-bl-full opacity-50 transform translate-x-10 -translate-y-10"></div>
-                        </div>
+                        {/* Print-safe Letterhead Background */}
+                        <img
+                            src={formData.companyName === 'Agrocel Industries Pvt. Ltd.' ? '/agrocel_letterhead.jpg' : '/solaris_letterhead.jpg'}
+                            alt="Letterhead Background"
+                            className="absolute inset-0 w-full h-full object-fill z-0 pointer-events-none"
+                        />
 
-                        {/* Content Container */}
-                        <div className="relative z-10 p-16 flex-1 flex flex-col">
-                            {/* Logo Section */}
-                            <div className="flex justify-center mb-12">
-                                <div className="flex items-center gap-4">
-                                    {/* Dynamic Logo */}
-                                    <div className="w-16 h-16 bg-white rounded-xl flex items-center justify-center shadow-lg transform rotate-3 overflow-hidden">
-                                        {formData.logo ? (
-                                            <img src={formData.logo} alt="Company Logo" className="w-full h-full object-contain" />
-                                        ) : (
-                                            <Building className="w-8 h-8 text-purple-600" />
-                                        )}
-                                    </div>
-                                    <div className="text-left">
-                                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight uppercase">{formData.companyName}</h1>
-                                        <div className="h-1 w-20 bg-purple-600 mt-1 rounded-full"></div>
-                                    </div>
-                                </div>
-                            </div>
+                        {/* Page Content padding margins */}
+                        <div className="px-[20mm] pt-[55mm] pb-[60mm] flex-1 text-[8.5pt] leading-[1.25] flex flex-col relative z-10">
 
-                            {/* Title */}
-                            <div className="text-center mb-12">
-                                <h2 className="text-2xl font-bold text-purple-700 uppercase tracking-widest border-b-2 border-purple-100 inline-block pb-2">
-                                    Job Offer Letter
-                                </h2>
-                            </div>
-
-                            {/* Meta Data */}
-                            <div className="flex justify-between mb-8 text-slate-600">
-                                <div>
-                                    <p className="font-bold text-slate-900">To:</p>
-                                    <p className="text-lg font-medium">{formData.candidateName || '[Candidate Name]'}</p>
-                                </div>
+                            {/* Header / Date / Doc Code */}
+                            <div className="flex justify-end mb-3 relative">
                                 <div className="text-right">
-                                    <p className="font-bold text-slate-900">Date:</p>
-                                    <p className="font-medium">{formData.dateOfLetter}</p>
+                                    <p className="whitespace-pre-wrap tracking-wide font-medium">
+                                        {formData.documentCode}
+                                    </p>
+                                    <p className="font-bold mt-1 text-[8.5pt]">{formatDateWithOrdinal(formData.dateOfLetter)}</p>
                                 </div>
+                            </div>
+
+                            {/* Recipient Details */}
+                            <div className="mb-3 font-bold text-[8.5pt] leading-snug">
+                                <p>To,</p>
+                                <p>{formData.title} {fullName}</p>
+                                {formData.addressLine1 && <p>{formData.addressLine1}</p>}
+                                {formData.addressLine2 && <p>{formData.addressLine2}</p>}
+                                <p>
+                                    {formData.city}{formData.city && formData.district && ', '}
+                                    {formData.district && `Dist: ${formData.district}`}{(formData.city || formData.district) && formData.state && ', '}
+                                    {formData.state}.
+                                </p>
+                                {formData.pin && <p>Pin: {formData.pin}</p>}
+                                {formData.mobile && <p>Mob: {formData.mobile}</p>}
+                                {formData.email && (
+                                    <p>
+                                        Email: <span className="text-blue-600 underline font-normal">{formData.email}</span>
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Salutation */}
+                            <div className="mb-3">
+                                <p>Dear <b>{formData.title} {firstName}</b>,</p>
                             </div>
 
                             {/* Subject */}
-                            <div className="mb-8">
-                                <p className="font-bold text-slate-900">Subject: <span className="font-normal">Employment Opportunity at {formData.companyName}</span></p>
-                            </div>
-
-                            {/* Body */}
-                            <div className="space-y-6 text-slate-700 leading-relaxed text-justify">
-                                <p>Dear <span className="font-bold text-slate-900">{formData.candidateName || '[Candidate Name]'}</span>,</p>
-
-                                <p>
-                                    We are excited to offer you the role of <span className="font-bold text-purple-700">{formData.role || '[Role Name]'}</span> at {formData.companyName}.
-                                </p>
-
-                                <p>
-                                    Your ability to combine fresh ideas with strategic thinking will be invaluable as we continue to expand our creative reach and deliver impactful solutions to our clients.
-                                </p>
-
-                                <p>
-                                    Your journey with us is set to begin on <span className="font-bold text-slate-900">{formData.joiningDate || '[Date of Joining]'}</span>, at our Creative Hub Office. In this role, you will be part of a passionate team dedicated to innovation, collaboration, and excellence in design.
-                                </p>
-
-                                {formData.salary && (
-                                    <p>
-                                        Your starting salary will be <span className="font-bold text-slate-900">{formData.salary}</span> per annum, along with other benefits provided in alignment with your experience and industry standards.
-                                    </p>
-                                )}
-
-                                <p>
-                                    We look forward to the unique perspective and vision you will bring to our projects. Please confirm your acceptance of this offer by signing and returning a copy of this letter within 3 days.
+                            <div className="mb-3 text-center font-bold">
+                                <p className="underline underline-offset-2 decoration-1">
+                                    Sub: - Offer letter for the post of {formData.role || '[Role]'} at {formData.location || '[Location]'} {formData.companyName === 'Solaris Chemtech Industries Ltd.' ? 'Location.' : ''}
                                 </p>
                             </div>
 
-                            {/* Signature */}
-                            <div className="mt-16 mb-8">
-                                <p className="text-slate-600 mb-8">With great anticipation,</p>
+                            {/* Body Paragraphs */}
+                            <div className="space-y-2 text-justify" style={{ wordSpacing: '1px' }}>
+                                <p>
+                                    This refers to your application for employment and the subsequent discussions you had with us. We are pleased to inform you that you have met our selection criteria and send you this offer of employment with our organization as <b>{formData.role || '[Role]'}</b>. You will be based at <b>{formData.location || '[Location]'}</b>{formData.companyName === 'Solaris Chemtech Industries Ltd.' ? ' Location' : ''}. You will be reporting functionally to <b>{formData.managerName || '[Manager Name]'} - {formData.managerRole || '[Manager Role]'}</b>, initially for 6 months you will be on probation.
+                                </p>
 
-                                <div className="mb-4">
-                                    {/* Signature Font Style */}
-                                    <div className="font-handwriting text-4xl text-slate-900 transform -rotate-2 inline-block">
-                                        {formData.signatoryName.split(' ')[0]}
+                                <p>
+                                    <b>Annual Package:</b> You will be paid annual CTC discussed & mutually decided, you will be given a detailed appointment letter with specific terms and conditions of employment and annual breakup of CTC at the time of joining.
+                                </p>
+
+                                <div className="pl-6 space-y-1 my-2 text-justify">
+                                    <p className="pl-4 -indent-4">1.&nbsp;&nbsp;&nbsp;&nbsp;<b>Joining:</b> Your joining date will be on or before <b>{formatDotDate(formData.joiningDate) || '[DD.MM.YYYY]'}</b>.</p>
+                                    <p className="pl-4 -indent-4">2.&nbsp;&nbsp;&nbsp;&nbsp;<b>Medical checkup:</b> You are required to undergo for a pre-employment medical checkup as per attached. This offer is subject to your positive medical fitness certificate.</p>
+                                </div>
+
+                                <p>
+                                    This offer is subject to our receiving appropriate response to the reference checks and for this purpose, we request you to provide us contact details of two of your professional references.
+                                </p>
+
+                                <p>
+                                    As a part of our recruitment procedure, you are requested to furnish the testimonials along with acceptance of offer as per the list attached.
+                                </p>
+
+                                <p>
+                                    Kindly sign the duplicate copy of this offer letter as an acknowledgement and return to us before <b>{formatDotDate(formData.returnDate) || '[DD.MM.YYYY]'}</b> and resignation accepted copy of current organization within 07 days of acceptance of this letter, failing which this offer shall stand withdrawn.
+                                </p>
+
+                                <p>
+                                    Appointment Letter with all the other terms and conditions will be issued to you at the time of joining.
+                                </p>
+
+                                <p>
+                                    We congratulate you and look forward to having you on board.
+                                </p>
+                            </div>
+
+                            {/* Signatures / Footer */}
+                            <div className="mt-auto flex justify-between font-bold" style={{ paddingTop: '10px' }}>
+                                <div className="flex flex-col">
+                                    <p>For {formData.companyName}</p>
+                                    <div className="mt-8">
+                                        <p>({formData.signatoryName || '[Signatory Name]'})</p>
+                                        <p>{formData.signatoryRole || '[Signatory Role]'}</p>
+                                        <p className="mt-2 flex items-end">
+                                            Prepared By: H.R. Dept.: <span className="inline-block border-b border-black w-24 ml-2"></span>
+                                        </p>
                                     </div>
                                 </div>
-
-                                <div>
-                                    <p className="font-bold text-slate-900">{formData.signatoryName}</p>
-                                    <p className="text-slate-500 text-sm">{formData.signatoryRole}</p>
+                                <div className="flex flex-col text-center" style={{ marginRight: formData.companyName === 'Solaris Chemtech Industries Ltd.' ? '0' : '40px' }}>
+                                    <p>All above agreed & accepted.</p>
+                                    <div className="mt-8 relative">
+                                        <p>({fullName})</p>
+                                        <p>Candidate</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Footer Graphic */}
-                        <div className="absolute bottom-0 right-0 w-full h-24 overflow-hidden pointer-events-none">
-                            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
-                                <path d="M0 100 L100 100 L100 0 Z" fill="#f3e8ff" />
-                                <path d="M50 100 L100 100 L100 50 Z" fill="#9333ea" opacity="0.1" />
-                            </svg>
-                            <div className="absolute bottom-4 left-8 flex gap-6 text-xs text-slate-400">
-                                <div className="flex items-center">
-                                    <span className="w-2 h-2 bg-purple-400 rounded-full mr-2"></span>
-                                    123-456-7890
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="w-2 h-2 bg-purple-400 rounded-full mr-2"></span>
-                                    contact@{formData.companyName.toLowerCase().replace(/\s+/g, '')}.com
-                                </div>
-                            </div>
+                            {/* Empty space at bottom to push content correctly */}
+                            <div className="h-0"></div>
+
                         </div>
                     </div>
                 </div>
@@ -374,39 +698,46 @@ const OfferLetter = () => {
             {/* Print Styles */}
             <style>{`
                 @media print {
-                    @page { margin: 0; }
+                    @page { margin: 0; size: A4 portrait; }
+                    body { background: white; }
                     body * { visibility: hidden; }
+                    
+                    /* Hide scrollbars during print */
+                    ::-webkit-scrollbar { display: none; }
+                    
+                    /* Override styles for printing */
                     .print\\:bg-white { background-color: white !important; }
-                    .print\\:shadow-none { box-shadow: none !important; }
+                    .print\\:shadow-none { box-shadow: none !important; border: none !important; }
                     .print\\:overflow-visible { overflow: visible !important; }
-                    .print\\:w-full { width: 100% !important; }
-                    .print\\:h-auto { height: auto !important; }
+                    .print\\:w-full { width: 100% !important; max-width: 100% !important; }
+                    .print\\:h-auto { height: auto !important; max-height: none !important; }
                     .print\\:hidden { display: none !important; }
                     
-                    /* Target the letter container specifically */
+                    /* Specifically show the letter content */
                     div:has(> .print\\:shadow-none), 
                     div:has(> .print\\:shadow-none) * {
                         visibility: visible;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
                     }
                     
-                    /* Ensure the letter takes up the full page */
+                    /* Position the letter exactly on the physical page */
                     div:has(> .print\\:shadow-none) {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        margin: 0;
-                        padding: 0;
+                        position: fixed !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 210mm !important;
+                        height: 297mm !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                     }
-                }
-                
-                /* Add a handwriting font if possible, or fallback to cursive */
-                @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap');
-                .font-handwriting {
-                    font-family: 'Dancing Script', cursive;
+
+                    /* Important: Reset the inner letter transform completely */
+                    .transform { transform: none !important; }
+                    .hover\\:scale-\\[1\\.01\\]:hover { transform: none !important; }
                 }
             `}</style>
-        </div >
+        </div>
     );
 };
 

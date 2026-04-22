@@ -31,6 +31,16 @@ export default defineConfig({
                 changeOrigin: true,
                 rewrite: (path) => path.replace(/^\/google-drive/, ''),
             },
+            '/pucho-files': {
+                target: 'https://studio.pucho.ai',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/pucho-files/, ''),
+            },
+            '/studio-api': {
+                target: 'https://studio.pucho.ai',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/studio-api/, ''),
+            },
         },
     },
 })
